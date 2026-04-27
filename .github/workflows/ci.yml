@@ -49,8 +49,8 @@ jobs:
         run: mvn verify -q
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/groupsessiondb
-          SPRING_DATASOURCE_USERNAME: jacobo
-          SPRING_DATASOURCE_PASSWORD: jacobo123
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
 
       - name: Upload JaCoCo report
         uses: actions/upload-artifact@v4
