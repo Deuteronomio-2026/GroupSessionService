@@ -42,8 +42,6 @@ class GroupSessionServiceTest {
     @InjectMocks
     private GroupSessionService groupSessionService;
 
-    // ─── Datos de prueba reutilizables ────────────────────────────────────────
-
     private UUID sessionId;
     private UUID psychologistId;
     private UUID patientId;
@@ -103,8 +101,6 @@ class GroupSessionServiceTest {
 
             when(groupSessionRepository.save(any(GroupSession.class)))
                     .thenReturn(pendingSession);
-            when(enrollmentRepository.countByGroupSessionId(any()))
-                    .thenReturn(0L);
 
             GroupSessionResponseDTO result = groupSessionService.requestSession(dto);
 
@@ -129,7 +125,6 @@ class GroupSessionServiceTest {
                     .status(GroupSessionStatus.PENDING).version(0).build();
 
             when(groupSessionRepository.save(any())).thenReturn(session);
-            when(enrollmentRepository.countByGroupSessionId(any())).thenReturn(0L);
 
             GroupSessionResponseDTO result = groupSessionService.requestSession(dto);
 
@@ -233,7 +228,7 @@ class GroupSessionServiceTest {
         void availableSpotsMinimoEsCero() {
             when(groupSessionRepository.findByStatus(GroupSessionStatus.APPROVED))
                     .thenReturn(List.of(approvedSession));
-            when(enrollmentRepository.countByGroupSessionId(sessionId)).thenReturn(10L); // más que maxParticipants=5
+            when(enrollmentRepository.countByGroupSessionId(sessionId)).thenReturn(10L);
 
             List<GroupSessionResponseDTO> result = groupSessionService.getApprovedSessions();
 
@@ -310,7 +305,7 @@ class GroupSessionServiceTest {
             when(enrollmentRepository.existsByGroupSessionIdAndPatientId(sessionId, patientId))
                     .thenReturn(false);
             when(enrollmentRepository.countByGroupSessionId(sessionId))
-                    .thenReturn(5L); // igual a maxParticipants=5
+                    .thenReturn(5L);
 
             assertThatThrownBy(() -> groupSessionService.enrollPatient(sessionId, new EnrollRequestDTO(patientId)))
                     .isInstanceOf(ConflictException.class)
