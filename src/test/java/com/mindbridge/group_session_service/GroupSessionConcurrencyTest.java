@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,7 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("GroupSessionService — prueba de concurrencia")
+@DisplayName("GroupSessionService — pruebas de concurrencia")
 class GroupSessionConcurrencyTest {
 
     @Mock
@@ -66,55 +67,65 @@ class GroupSessionConcurrencyTest {
                 .build();
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // Prueba 1: 10 hilos compiten — solo 3 deben inscribirse
+    // ═════════════════════════════════════════════════════════════════════════
+
     @Test
     @DisplayName("🔒 10 hilos intentan inscribirse — solo se aceptan maxParticipants (3)")
-    void soloDeberiaAceptarHastaMAxParticipants() throws InterruptedException {
+    void soloDeberiaAceptarHastaMaxParticipants() throws InterruptedException {
 
-        // ─── Contador compartido que simula la BD ────────────────────────────
+        // ─── Estado compartido con acceso atómico ─────────────────────────────
+        // El objeto 'lock' garantiza que count+save sean una operación atómica,
+        // igual que lo haría el PESSIMISTIC_WRITE en la BD real.
+        final Object lock = new Object();
         AtomicInteger enrolledCount = new AtomicInteger(0);
 
-        // Cada hilo tiene su propio patientId — nadie duplicado
-        List<UUID> patientIds = new java.util.ArrayList<>();
+        List<UUID> patientIds = new ArrayList<>();
         for (int i = 0; i < TOTAL_THREADS; i++) {
             patientIds.add(UUID.randomUUID());
         }
 
-        // ─── Mocks sincronizados ─────────────────────────────────────────────
-
-        // findByIdWithLock siempre devuelve la sesión
-        when(groupSessionRepository.findByIdWithLock(sessionId))
+        // findByIdWithLock: siempre devuelve la sesión
+        lenient().when(groupSessionRepository.findByIdWithLock(sessionId))
                 .thenReturn(Optional.of(approvedSession));
 
-        // Ningún paciente está duplicado
-        when(enrollmentRepository.existsByGroupSessionIdAndPatientId(eq(sessionId), any(UUID.class)))
+        // existsByGroupSessionIdAndPatientId: nadie duplicado
+        lenient().when(enrollmentRepository.existsByGroupSessionIdAndPatientId(eq(sessionId), any(UUID.class)))
                 .thenReturn(false);
 
-        // countByGroupSessionId lee el estado real del contador compartido
-        when(enrollmentRepository.countByGroupSessionId(sessionId))
-                .thenAnswer(inv -> (long) enrolledCount.get());
-
-        // save incrementa el contador y devuelve el enrollment
-        when(enrollmentRepository.save(any(GroupSessionEnrollment.class)))
+        // countByGroupSessionId + save: sincronizados con el mismo lock
+        // para simular correctamente el comportamiento del @Lock de JPA
+        lenient().when(enrollmentRepository.countByGroupSessionId(sessionId))
                 .thenAnswer(inv -> {
-                    enrolledCount.incrementAndGet();
-                    return inv.getArgument(0);
+                    synchronized (lock) {
+                        return (long) enrolledCount.get();
+                    }
+                });
+
+        lenient().when(enrollmentRepository.save(any(GroupSessionEnrollment.class)))
+                .thenAnswer(inv -> {
+                    synchronized (lock) {
+                        enrolledCount.incrementAndGet();
+                        return inv.getArgument(0);
+                    }
                 });
 
         // ─── Lanzar 10 hilos simultáneos ─────────────────────────────────────
         ExecutorService executor = Executors.newFixedThreadPool(TOTAL_THREADS);
-        CountDownLatch startGate = new CountDownLatch(1); // todos arrancan juntos
+        CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch endGate   = new CountDownLatch(TOTAL_THREADS);
 
-        List<String> successes = new CopyOnWriteArrayList<>();
+        List<String> successes  = new CopyOnWriteArrayList<>();
         List<String> rejections = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < TOTAL_THREADS; i++) {
             final UUID patientId = patientIds.get(i);
-            final int threadNum  = i + 1;
+            final int  threadNum = i + 1;
 
             executor.submit(() -> {
                 try {
-                    startGate.await(); // esperar a que todos estén listos
+                    startGate.await();
                     groupSessionService.enrollPatient(sessionId, new EnrollRequestDTO(patientId));
                     successes.add("Hilo-" + threadNum + " inscrito ✅");
                 } catch (ConflictException e) {
@@ -127,11 +138,11 @@ class GroupSessionConcurrencyTest {
             });
         }
 
-        startGate.countDown();        // ¡arranca la carrera!
-        endGate.await();              // esperar que todos terminen
+        startGate.countDown(); // ¡arranca la carrera!
+        endGate.await();
         executor.shutdown();
 
-        // ─── Resultados ───────────────────────────────────────────────────────
+        // ─── Log de resultados ────────────────────────────────────────────────
         System.out.println("\n═══ Resultado de concurrencia ══════════════════════");
         System.out.println("MaxParticipants : " + MAX_PARTICIPANTS);
         System.out.println("Hilos totales   : " + TOTAL_THREADS);
@@ -144,11 +155,11 @@ class GroupSessionConcurrencyTest {
 
         // ─── Assertions ───────────────────────────────────────────────────────
         assertThat(successes.size())
-                .as("No se deben aceptar más inscripciones que maxParticipants")
+                .as("No deben aceptarse más inscripciones que maxParticipants")
                 .isLessThanOrEqualTo(MAX_PARTICIPANTS);
 
         assertThat(successes.size() + rejections.size())
-                .as("Todos los hilos deben haber terminado (éxito o rechazo)")
+                .as("Todos los hilos deben terminar (éxito o rechazo)")
                 .isEqualTo(TOTAL_THREADS);
 
         assertThat(enrolledCount.get())
@@ -156,17 +167,20 @@ class GroupSessionConcurrencyTest {
                 .isLessThanOrEqualTo(MAX_PARTICIPANTS);
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // Prueba 2: sesión ya llena — todos los hilos son rechazados
+    // ═════════════════════════════════════════════════════════════════════════
+
     @Test
     @DisplayName("🔒 Sesión ya llena — todos los hilos son rechazados")
     void todosDeberianRechazarseSiSesionLlena() throws InterruptedException {
 
-        // La sesión ya tiene maxParticipants inscritos
-        when(groupSessionRepository.findByIdWithLock(sessionId))
+        lenient().when(groupSessionRepository.findByIdWithLock(sessionId))
                 .thenReturn(Optional.of(approvedSession));
-        when(enrollmentRepository.existsByGroupSessionIdAndPatientId(eq(sessionId), any()))
+        lenient().when(enrollmentRepository.existsByGroupSessionIdAndPatientId(eq(sessionId), any()))
                 .thenReturn(false);
-        when(enrollmentRepository.countByGroupSessionId(sessionId))
-                .thenReturn((long) MAX_PARTICIPANTS); // ya llena
+        lenient().when(enrollmentRepository.countByGroupSessionId(sessionId))
+                .thenReturn((long) MAX_PARTICIPANTS); // ya llena desde el inicio
 
         ExecutorService executor = Executors.newFixedThreadPool(TOTAL_THREADS);
         CountDownLatch startGate = new CountDownLatch(1);
