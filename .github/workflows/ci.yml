@@ -74,4 +74,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/group-session-service:latest
+          tags: ghcr.io/deuteronomio-2026/group-session-service:lates
