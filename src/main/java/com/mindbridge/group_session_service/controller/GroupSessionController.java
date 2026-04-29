@@ -78,6 +78,24 @@ public class GroupSessionController {
         return ResponseEntity.ok(groupSessionService.getApprovedSessions());
     }
 
+    // ─── GET /api/group-sessions/psychologist/{psychologistId} ───────────────
+    @Operation(
+            summary = "Obtener sesiones grupales de un psicólogo",
+            description = "Retorna todas las sesiones grupales solicitadas por un psicólogo específico, incluyendo estados PENDING, APPROVED, CANCELLED o COMPLETED."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de sesiones del psicólogo",
+                    content = @Content(schema = @Schema(implementation = GroupSessionResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "ID de psicólogo inválido", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Psicólogo no encontrado", content = @Content)
+    })
+    @GetMapping("/psychologist/{psychologistId}")
+    public ResponseEntity<List<GroupSessionResponseDTO>> getSessionsByPsychologist(
+            @Parameter(description = "UUID del psicólogo", required = true)
+            @PathVariable UUID psychologistId) {
+        return ResponseEntity.ok(groupSessionService.getPsychologistSessions(psychologistId));
+    }
+
     // ─── POST /api/group-sessions/{id}/enroll ────────────────────────────────
     @Operation(
             summary = "Inscribirse en una sesión",
@@ -115,6 +133,7 @@ public class GroupSessionController {
         return ResponseEntity.ok(groupSessionService.cancelSession(id));
     }
 
+    // ─── DELETE /api/group-sessions/{id} ─────────────────────────────────────
     @Operation(
             summary = "Eliminar una sesión grupal",
             description = "Elimina permanentemente una sesión. No se permite eliminar sesiones en estado APPROVED — cancélalas primero."

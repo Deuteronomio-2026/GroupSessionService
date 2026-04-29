@@ -21,5 +21,6 @@ public interface GroupSessionRepository extends JpaRepository<GroupSession, UUID
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM GroupSession o WHERE o.id = :id")
     Optional<GroupSession> findByIdWithLock(@Param("id") UUID id);
+    List<GroupSession> findByPsychologistId(UUID psychologistId);
 
 }

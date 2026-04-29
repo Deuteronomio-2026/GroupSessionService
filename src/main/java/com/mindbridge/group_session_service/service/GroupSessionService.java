@@ -77,6 +77,17 @@ public class GroupSessionService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<GroupSessionResponseDTO> getPsychologistSessions(UUID psychologistId) {
+        return groupSessionRepository.findByPsychologistId(psychologistId)
+                .stream()
+                .map(session -> {
+                    long enrolled = enrollmentRepository.countByGroupSessionId(session.getId());
+                    return toResponseDTO(session, enrolled);
+                })
+                .collect(Collectors.toList());
+    }
+
     // ─── Historia 4: Paciente se inscribe ────────────────────────────────────
 
     @Transactional
@@ -151,6 +162,8 @@ public class GroupSessionService {
         );
         groupSessionRepository.delete(session);
     }
+
+
 
     // ─── Mapper interno ──────────────────────────────────────────────────────
 
