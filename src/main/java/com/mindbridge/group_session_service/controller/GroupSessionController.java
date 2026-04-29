@@ -96,6 +96,20 @@ public class GroupSessionController {
         return ResponseEntity.ok(groupSessionService.getPsychologistSessions(psychologistId));
     }
 
+    @Operation(
+            summary = "Obtener sesiones grupales",
+            description = "Retorna todas las sesiones grupales, incluyendo estados PENDING, APPROVED, CANCELLED o COMPLETED."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de sesiones",
+                    content = @Content(schema = @Schema(implementation = GroupSessionResponseDTO.class))),
+
+    })
+    @GetMapping
+    public ResponseEntity<List<GroupSessionResponseDTO>> getSessions(){
+        return ResponseEntity.ok(groupSessionService.getAllGroupSession());
+    }
+
     // ─── POST /api/group-sessions/{id}/enroll ────────────────────────────────
     @Operation(
             summary = "Inscribirse en una sesión",
@@ -150,4 +164,6 @@ public class GroupSessionController {
         groupSessionService.deleteSession(id);
         return ResponseEntity.noContent().build();
     }
+
+
 }

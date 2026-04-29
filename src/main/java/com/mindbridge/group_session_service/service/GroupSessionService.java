@@ -88,6 +88,16 @@ public class GroupSessionService {
                 .collect(Collectors.toList());
     }
 
+    public List<GroupSessionResponseDTO> getAllGroupSession(){
+        return groupSessionRepository.findAll()
+                .stream()
+                .map(session -> {
+                    long enrolled = enrollmentRepository.countByGroupSessionId(session.getId());
+                    return toResponseDTO(session, enrolled);
+                })
+                .collect(Collectors.toList());
+    }
+
     // ─── Historia 4: Paciente se inscribe ────────────────────────────────────
 
     @Transactional
