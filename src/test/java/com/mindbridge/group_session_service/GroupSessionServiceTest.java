@@ -19,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,6 +40,9 @@ class GroupSessionServiceTest {
 
     @Mock
     private GroupSessionEnrollmentRepository enrollmentRepository;
+
+    @MockBean
+    private RabbitTemplate rabbitTemplate;
 
     @InjectMocks
     private GroupSessionService groupSessionService;
