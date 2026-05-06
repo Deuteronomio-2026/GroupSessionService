@@ -13,6 +13,8 @@ import com.mindbridge.group_session_service.repository.GroupSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +27,10 @@ public class GroupSessionService {
 
     private final GroupSessionRepository groupSessionRepository;
     private final GroupSessionEnrollmentRepository enrollmentRepository;
+    private final RabbitTemplate rabbitTemplate;
+
+    @Value("${rabbitmq.exchange}")
+    private String exchange;
 
     // ─── Historia 1: Psicólogo solicita sesión ───────────────────────────────
 
@@ -41,6 +47,9 @@ public class GroupSessionService {
                 .build();
 
         GroupSession saved = groupSessionRepository.save(session);
+
+        rabbitTemplate.convertAndSend(exchange, "session.requested", toResponseDTO(saved, 0L));
+
         return toResponseDTO(saved, 0L);
     }
 
@@ -61,6 +70,10 @@ public class GroupSessionService {
         session.setStatus(GroupSessionStatus.APPROVED);
         GroupSession updated = groupSessionRepository.save(session);
         long enrolled = enrollmentRepository.countByGroupSessionId(id);
+
+        // Publicar evento
+        rabbitTemplate.convertAndSend(exchange, "session.approved", toResponseDTO(updated, enrolled));
+
         return toResponseDTO(updated, enrolled);
     }
 
@@ -130,6 +143,9 @@ public class GroupSessionService {
                 .build();
 
         enrollmentRepository.save(enrollment);
+
+        //  Publicar evento
+        rabbitTemplate.convertAndSend(exchange, "session.enrolled", toResponseDTO(session, currentEnrolled + 1));
         return toResponseDTO(session, currentEnrolled + 1);
     }
 
@@ -153,6 +169,8 @@ public class GroupSessionService {
         session.setStatus(GroupSessionStatus.CANCELLED);
         GroupSession updated = groupSessionRepository.save(session);
         long enrolled = enrollmentRepository.countByGroupSessionId(id);
+
+        rabbitTemplate.convertAndSend(exchange, "session.cancelled", toResponseDTO(updated, enrolled));
         return toResponseDTO(updated, enrolled);
     }
 

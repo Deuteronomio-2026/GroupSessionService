@@ -10,8 +10,10 @@ import com.mindbridge.group_session_service.service.GroupSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -32,6 +34,9 @@ class GroupSessionConcurrencyIT {
 
     @Autowired
     private GroupSessionEnrollmentRepository enrollmentRepository;
+
+    @MockBean
+    private RabbitTemplate rabbitTemplate;
 
     private static final int MAX_PARTICIPANTS = 3;
     private static final int TOTAL_THREADS = 10;
