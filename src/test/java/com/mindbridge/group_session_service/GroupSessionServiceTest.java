@@ -41,7 +41,7 @@ class GroupSessionServiceTest {
     @Mock
     private GroupSessionEnrollmentRepository enrollmentRepository;
 
-    @MockBean
+    @Mock
     private RabbitTemplate rabbitTemplate;
 
     @InjectMocks
