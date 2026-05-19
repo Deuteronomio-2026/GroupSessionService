@@ -48,6 +48,10 @@ jobs:
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres
 
+      - name: SonarCloud Analysis
+        run: mvn sonar:sonar -Dsonar.projectKey=Deuteronomio-2026_GroupSessionService -Dsonar.organization=deuteronomio-2026 -Dsonar.host.url=https://sonarcloud.io -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - name: Upload JaCoCo report
         uses: actions/upload-artifact@v4
         if: always()
